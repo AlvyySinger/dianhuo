@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>三倍辣点货 v11.0</title>
+    <style>
+        /* === 基础样式 === */
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f2f2f7; padding: 15px 10px; max-width: 600px; margin: 0 auto; -webkit-tap-highlight-color: transparent; padding-bottom: 120px; overflow-x: hidden; }
+        .header { text-align: center; margin-bottom: 20px; }
+        .header h1 { font-size: 20px; margin: 0; color: #333; font-weight: 800; }
+        .date-display { font-size: 13px; color: #888; margin-top: 4px; }
+        .section-title { font-size: 15px; color: #666; font-weight: bold; margin: 25px 0 10px 5px; border-left: 4px solid #ff3b30; padding-left: 10px; }
+
+        /* === 双列布局核心 === */
+        .item-list { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+        .item-card { background: white; border-radius: 12px; padding: 12px 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.03); display: flex; flex-direction: column; justify-content: space-between; align-items: center; text-align: center; min-height: 85px; border: 2px solid transparent; transition: all 0.1s; position: relative; }
+        .name-area { margin-bottom: 8px; width: 100%; cursor: pointer; }
+        .item-name { font-size: 16px; font-weight: 600; color: #333; line-height: 1.2; }
+        .item-unit { font-size: 11px; color: #999; display: block; margin-top: 2px; }
+
+        /* 状态样式 */
+        .item-card.drink-card.unconfirmed { background-color: #fffbe6; border-color: #ffe58f; }
+        .item-card.drink-card.unconfirmed .item-name { color: #d48806; }
+        .item-card.drink-card.confirmed { background-color: #fff; border-color: #e8f5e9; } 
+        .item-card.drink-card.confirmed.has-count { border-color: #07c160; background-color: #f6ffed; }
+        .item-card.food-card.active { border-color: #ff3b30; background-color: #fff5f5; }
+        .item-card.misc-card { cursor: pointer; justify-content: center; } 
+        .item-card.misc-card.is-missing { background-color: #ffeaea; border-color: #ff3b30; }
+        .item-card.misc-card .status-text { font-size: 14px; font-weight: bold; color: #ccc; margin-top: 5px; }
+        .item-card.misc-card.is-missing .status-text { color: #ff3b30; }
+        .item-card.misc-card.is-missing .item-name { color: #ff3b30; }
+
+        /* 计数器 */
+        .counter-box { display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; }
+        .btn { width: 28px; height: 28px; border-radius: 50%; border: none; font-size: 18px; display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; touch-action: manipulation; position: relative; }
+        .minus { background-color: #f5f5f5; color: #666; }
+        .plus { background-color: #ff3b30; color: white; }
+        .count-num { font-size: 18px; font-weight: bold; width: 36px; text-align: center; font-variant-numeric: tabular-nums; }
+        .count-num.zero { color: #ddd; }
+
+        /* 编辑模式 */
+        .edit-controls { display: flex; gap: 4px; justify-content: center; margin-top: 5px; width: 100%; z-index: 10; }
+        .icon-btn { font-size: 12px; padding: 4px 8px; background: #fff; border: 1px solid #eee; border-radius: 4px; cursor: pointer; color: #666; }
+        .delete-btn { color: red; border-color: #ffeaea; }
+        .add-btn-card { grid-column: span 2; background: #fafafa; border: 2px dashed #eee; border-radius: 12px; color: #aaa; font-weight: bold; padding: 15px; text-align: center; cursor: pointer; }
+        
+        /* 底部 */
+        .footer { position: fixed; bottom: 30px; left: 0; right: 0; padding: 0 20px; text-align: center; pointer-events: none; z-index: 100; }
+        .submit-btn { pointer-events: auto; background-color: #333; color: white; border: none; padding: 15px 0; font-size: 17px; font-weight: bold; border-radius: 30px; width: 100%; max-width: 600px; box-shadow: 0 5px 20px rgba(0,0,0,0.25); }
+        .action-bar { pointer-events: auto; display: flex; justify-content: center; gap: 15px; margin-top: 15px; }
+        .text-link { font-size: 12px; color: #666; text-decoration: none; cursor: pointer; background: rgba(255,255,255,0.9); padding: 6px 12px; border-radius: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); border: 1px solid rgba(0,0,0,0.05); }
+
+        /* === 🎂 生日惊喜专属样式 === */
+        #birthday-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            /* 这里引用你的背景图，确保图片名字和格式对应 */
+            background-image: url('bg.jpg'); 
+            background-size: cover; background-position: center;
+            z-index: 9999; display: none; flex-direction: column;
+            justify-content: center; align-items: center;
+            transition: opacity 1.5s ease-out; /* 渐渐淡出 */
+        }
+        /* 给背景加个半透明黑罩，让文字更清楚 */
+        .overlay-mask { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: -1; }
+        .gift-box { background: rgba(255,255,255,0.9); padding: 30px 40px; border-radius: 20px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.3); backdrop-filter: blur(10px); animation: float 3s ease-in-out infinite; }
+        .cake-emoji { font-size: 60px; margin-bottom: 10px; }
+        .gift-text { font-size: 18px; font-weight: bold; color: #333; margin-bottom: 20px; }
+        .open-btn { background-color: #ff3b30; color: white; border: none; padding: 12px 30px; font-size: 18px; font-weight: bold; border-radius: 30px; cursor: pointer; box-shadow: 0 4px 15px rgba(255,59,48,0.4); }
+        
+        @keyframes float { 0% { transform: translateY(0px); } 50% { transform: translateY(-10px); } 100% { transform: translateY(0px); } }
+
+        /* 小心心动画容器 */
+        .floating-heart { position: fixed; font-size: 20px; pointer-events: none; animation: flyUp 1s ease-out forwards; z-index: 9998; }
+        @keyframes flyUp { 0% { transform: translateY(0) scale(1) rotate(0deg); opacity: 1; } 100% { transform: translateY(-80px) scale(1.5) rotate(20deg); opacity: 0; } }
+
+    </style>
+</head>
+<body>
+    
+    <audio id="bgm" src="23.mp3" preload="auto"></audio>
+
+    <div id="birthday-overlay">
+        <div class="overlay-mask"></div>
+        <div class="gift-box">
+            <div class="cake-emoji">🎂</div>
+            <div class="gift-text">生日快乐呀！<br></div>
+            <button class="open-btn" onclick="openGift()">我王冉冉郑重宣布：我是傻子</button>
+        </div>
+    </div>
+
+    <div class="header">
+        <h1 id="page-title">三倍辣点货</h1>
+        <div class="date-display" id="date-str"></div>
+    </div>
+    <div id="app-container"></div>
+
+    <div class="footer">
+        <button id="main-btn" class="submit-btn" onclick="exportOrder()">📋 复制点货单</button>
+        <div class="action-bar">
+            <div id="edit-btn" class="text-link" onclick="toggleEditMode()" style="color:#007aff;">✏️ 编辑菜单</div>
+            <div id="backup-btn" class="text-link" onclick="exportConfig()" style="display:none;">📥 备份配置</div>
+            <div id="reset-btn" class="text-link" onclick="factoryReset()" style="color:red; display:none;">⚠️ 重置</div>
+        </div>
+    </div>
+
+    <script>
+        // ==========================================
+        // 🎂 设定冉冉的生日日期 (月份不用加0，比如 11)
+        // ==========================================
+        const BIRTHDAY_MONTH = 4; // 替换为真实的月份
+        const BIRTHDAY_DAY = 15;   // 替换为真实的日期
+        
+        let isBirthdayToday = false; // 全局标记今天是不是生日
+
+        function checkBirthdayMagic() {
+            const today = new Date();
+            // 如果今天是生日
+            if (today.getMonth() + 1 === BIRTHDAY_MONTH && today.getDate() === BIRTHDAY_DAY) {
+                isBirthdayToday = true;
+                // 显示全屏遮罩
+                document.getElementById('birthday-overlay').style.display = 'flex';
+                // 改变标题
+                document.getElementById('page-title').innerHTML = '👑 生日快乐 👑';
+            }
+        }
+
+        // 点击“拆礼物”按钮执行
+        function openGift() {
+            // 1. 播放音乐
+            const bgm = document.getElementById('bgm');
+            bgm.volume = 0.8; // 稍微调低一点音量免得吓到
+            bgm.play().catch(e => console.log("浏览器限制自动播放", e));
+            
+            // 2. 淡出遮罩层
+            const overlay = document.getElementById('birthday-overlay');
+            overlay.style.opacity = '0';
+            setTimeout(() => {
+                overlay.style.display = 'none';
+            }, 1500); // 1.5秒后完全移除
+        }
+
+        // 💖 爆破小心心特效 (绑在 + 号上)
+        function spawnHearts(event) {
+            if (!isBirthdayToday) return; // 只有生日才爆特效
+            
+            const hearts = ['💖', '✨', '🎈', '🎉', '💕'];
+            // 每次点击生成 3 个符号
+            for(let i=0; i<3; i++) {
+                const heart = document.createElement('div');
+                heart.className = 'floating-heart';
+                // 随机选一个符号
+                heart.innerText = hearts[Math.floor(Math.random() * hearts.length)];
+                
+                // 设置生成位置为手指点击的位置，稍微加点随机偏移
+                const x = event.clientX + (Math.random() * 40 - 20);
+                const y = event.clientY + (Math.random() * 20 - 10);
+                heart.style.left = x + 'px';
+                heart.style.top = y + 'px';
+                
+                document.body.appendChild(heart);
+                
+                // 1秒动画结束后清理 DOM 垃圾
+                setTimeout(() => {
+                    heart.remove();
+                }, 1000);
+            }
+        }
+        // ==========================================
+
+
+        // === 默认配置 (V10 逻辑) ===
+        const defaultData = [
+            {
+                category: "食材", type: "normal",
+                items: [
+                    { name: "肉碎", unit: "盒", step: 1, count: 0 },
+                    { name: "面", unit: "盒", step: 1, count: 0 },
+                    { name: "葱", unit: "盒", step: 1, count: 0 },
+                    { name: "炸鸡", unit: "袋", step: 1, count: 0 },
+                    { name: "饺子", unit: "袋", step: 1, count: 0 },
+                    { name: "炸鸡酱", unit: "盒", step: 0.25, count: 0 },
+                    { name: "饺子酱", unit: "盒", step: 1, count: 0 },
+                    { name: "香菜", unit: "盒", step: 1, count: 0 },
+                    { name: "西红柿", unit: "盒", step: 1, count: 0 },
+                    { name: "担担酱", unit: "盒", step: 1, count: 0 },
+                    { name: "凉面酱", unit: "盒", step: 1, count: 0 },
+                    { name: "花生", unit: "盒", step: 1, count: 0 }
+                ]
+            },
+            {
+                category: "饮料", type: "drink",
+                items: [
+                    { name: "Coca", unit: "箱", step: 0.25, count: 1, checked: false },
+                    { name: "Coca zéro", unit: "箱", step: 0.25, count: 1, checked: false },
+                    { name: "Iced Tea", unit: "箱", step: 0.25, count: 1, checked: false },
+                    { name: "气泡水", unit: "箱", step: 0.25, count: 1, checked: false },
+                    { name: "青岛", unit: "箱", step: 0.25, count: 1, checked: false },
+                    { name: "asahi", unit: "箱", step: 0.25, count: 1, checked: false },
+                    { name: "王老吉", unit: "箱", step: 0.25, count: 1, checked: false },
+                    { name: "豆奶", unit: "箱", step: 0.25, count: 1, checked: false },
+                    { name: "Orangina", unit: "箱", step: 0.25, count: 1, checked: false },
+                    { name: "自用水", unit: "箱", step: 0.25, count: 1, checked: false }
+                ]
+            },
+            {
+                category: "杂项/其他", type: "misc",
+                items: [
+                    { name: "打包盒", isMissing: false },
+                    { name: "筷子", isMissing: false },
+                    { name: "餐巾纸", isMissing: false },
+                    { name: "垃圾袋", isMissing: false },
+                    { name: "洗洁精", isMissing: false }
+                ]
+            }
+        ];
+
+        let data = [];
+        let isEditMode = false;
+        const STORAGE_KEY = 'sanbeila_v10_local';
+        const appContainer = document.getElementById('app-container');
+        const titleEl = document.getElementById('page-title');
+
+        function initDate() {
+            const now = new Date();
+            if(!isBirthdayToday) titleEl.textContent = `${now.getMonth() + 1}月${now.getDate()}日 三倍辣点货`;
+        }
+
+        // === 核心数据逻辑 ===
+        function loadData() {
+            const savedJson = localStorage.getItem(STORAGE_KEY);
+            const todayStr = new Date().toDateString();
+            if (savedJson) {
+                const savedState = JSON.parse(savedJson);
+                data = savedState.data; 
+                if (savedState.date !== todayStr) resetDailyCounts();
+            } else {
+                data = JSON.parse(JSON.stringify(defaultData)); 
+            }
+        }
+
+        function resetDailyCounts() {
+            data.forEach(group => {
+                if (group.type === 'drink') { group.items.forEach(i => { i.count = 1; i.checked = false; }); } 
+                else if (group.type === 'normal') { group.items.forEach(i => { i.count = 0; }); } 
+                else if (group.type === 'misc') { group.items.forEach(i => { i.isMissing = false; }); }
+            });
+            saveData();
+        }
+
+        function saveData() {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify({ date: new Date().toDateString(), data: data }));
+        }
+
+        // === 渲染逻辑 ===
+        function render() {
+            appContainer.innerHTML = ''; 
+            data.forEach((group, groupIndex) => {
+                const sectionTitle = document.createElement('div');
+                sectionTitle.className = 'section-title';
+                sectionTitle.textContent = group.category;
+                appContainer.appendChild(sectionTitle);
+                const listEl = document.createElement('div');
+                listEl.className = 'item-list';
+
+                group.items.forEach((item, itemIndex) => {
+                    const card = document.createElement('div');
+                    
+                    if (isEditMode) {
+                        card.className = 'item-card';
+                        card.innerHTML = `
+                            <div style="width:100%; margin-bottom:5px;">
+                                <input type="text" value="${item.name}" 
+                                    onchange="updateName(${groupIndex}, ${itemIndex}, this.value)"
+                                    style="width:90%; font-size:14px; border:1px solid #ddd; padding:4px; text-align:center; border-radius:4px;">
+                            </div>
+                            <div class="edit-controls">
+                                <button class="icon-btn" onclick="moveItem(${groupIndex}, ${itemIndex}, -1)">⬅️</button>
+                                <button class="icon-btn" onclick="moveItem(${groupIndex}, ${itemIndex}, 1)">➡️</button>
+                                <button class="icon-btn delete-btn" onclick="deleteItem(${groupIndex}, ${itemIndex})">🗑️</button>
+                            </div>
+                        `;
+                    } 
+                    else {
+                        if (group.type === 'drink') {
+                            const isUnconfirmed = !item.checked;
+                            const hasCount = item.count > 0;
+                            card.className = `item-card drink-card ${isUnconfirmed ? 'unconfirmed' : 'confirmed'} ${hasCount ? 'has-count' : ''}`;
+                            card.innerHTML = `
+                                <div class="name-area" onclick="toggleDrinkCheck(${groupIndex}, ${itemIndex})">
+                                    <span class="item-name">${item.name}</span>
+                                    <span class="item-unit">(${item.unit})</span>
+                                    ${isUnconfirmed ? '<div style="font-size:10px; margin-top:2px;">(点我确认)</div>' : ''}
+                                </div>
+                                <div class="counter-box">
+                                    <button class="btn minus" onclick="updateCount(event, ${groupIndex}, ${itemIndex}, -1)">-</button>
+                                    <div class="count-num ${item.count===0?'zero':''}">${item.count}</div>
+                                    <button class="btn plus" onclick="updateCount(event, ${groupIndex}, ${itemIndex}, 1)">+</button>
+                                </div>
+                            `;
+                        } 
+                        else if (group.type === 'misc') {
+                            card.className = `item-card misc-card ${item.isMissing ? 'is-missing' : ''}`;
+                            card.onclick = () => toggleMiscMissing(groupIndex, itemIndex);
+                            card.innerHTML = `
+                                <span class="item-name">${item.name}</span>
+                                <div class="status-text">${item.isMissing ? '❗️ 缺货' : '⚪️ 货足'}</div>
+                            `;
+                        } 
+                        else {
+                            const isActive = item.count > 0;
+                            card.className = `item-card food-card ${isActive ? 'active' : ''}`;
+                            card.innerHTML = `
+                                <div class="name-area">
+                                    <span class="item-name">${item.name}</span>
+                                    <span class="item-unit">(${item.unit || '盒'})</span>
+                                </div>
+                                <div class="counter-box">
+                                    <button class="btn minus" onclick="updateCount(event, ${groupIndex}, ${itemIndex}, -1)">-</button>
+                                    <button class="btn plus" onclick="updateCount(event, ${groupIndex}, ${itemIndex}, 1)">+</button>
+                                </div>
+                                <div class="count-num ${item.count===0?'zero':''}" style="position:absolute; bottom:12px;">${item.count}</div>
+                            `;
+                        }
+                    }
+                    listEl.appendChild(card);
+                });
+
+                if (isEditMode) {
+                    const addBtn = document.createElement('div');
+                    addBtn.className = 'add-btn-card';
+                    addBtn.textContent = `+ 添加 ${group.category}`;
+                    addBtn.onclick = () => addItem(groupIndex);
+                    listEl.appendChild(addBtn);
+                }
+                appContainer.appendChild(listEl);
+            });
+        }
+
+        // === 交互逻辑 ===
+        function toggleDrinkCheck(g, i) { data[g].items[i].checked = !data[g].items[i].checked; saveData(); render(); }
+        function toggleMiscMissing(g, i) { data[g].items[i].isMissing = !data[g].items[i].isMissing; saveData(); render(); }
+
+        function updateCount(event, g, i, dir) {
+            event.stopPropagation();
+            // 💖 如果是加号，且是生日，调用特效函数
+            if(dir > 0) { spawnHearts(event); }
+
+            const item = data[g].items[i];
+            let n = Math.round((item.count + (item.step || 1) * dir) * 100) / 100;
+            if (n < 0) n = 0;
+            item.count = n;
+            if (data[g].type === 'drink') item.checked = true;
+            saveData(); render();
+        }
+
+        function toggleEditMode() {
+            isEditMode = !isEditMode;
+            const editBtn = document.getElementById('edit-btn');
+            const mainBtn = document.getElementById('main-btn');
+            const backupBtn = document.getElementById('backup-btn');
+            const resetBtn = document.getElementById('reset-btn');
+            if (isEditMode) {
+                editBtn.textContent = "✅ 完成"; editBtn.style.color = "#07c160";
+                mainBtn.style.opacity = 0.3; mainBtn.style.pointerEvents = "none";
+                backupBtn.style.display = "block"; resetBtn.style.display = "block";
+            } else {
+                editBtn.textContent = "✏️ 编辑菜单"; editBtn.style.color = "#007aff";
+                mainBtn.style.opacity = 1; mainBtn.style.pointerEvents = "auto";
+                backupBtn.style.display = "none"; resetBtn.style.display = "none";
+            }
+            render();
+        }
+
+        function updateName(g, i, val) { data[g].items[i].name = val; saveData(); }
+        function moveItem(g, i, dir) { const arr = data[g].items; const target = i + dir; if (target >= 0 && target < arr.length) { [arr[i], arr[target]] = [arr[target], arr[i]]; saveData(); render(); } }
+        function deleteItem(g, i) { if (confirm("确定删除吗？")) { data[g].items.splice(i, 1); saveData(); render(); } }
+        function addItem(g) {
+            const name = prompt("名称："); if (!name) return;
+            const groupType = data[g].type; let newItem = { name: name };
+            if (groupType === 'misc') { newItem.isMissing = false; } else {
+                newItem.unit = prompt("单位：", "盒") || "盒";
+                if (groupType === 'drink') { newItem.step = 0.25; newItem.count = 1; newItem.checked = false; } 
+                else { newItem.step = 1; newItem.count = 0; }
+            }
+            data[g].items.push(newItem); saveData(); render();
+        }
+
+        // === 导出逻辑 ===
+        function formatQuantityText(count) {
+            if (count === 0.25) return "小半箱"; if (count === 0.5) return "半箱"; if (count === 0.75) return "大半箱";
+            if (count === 1) return "一箱"; if (count === 1.25) return "一箱出头"; return count;
+        }
+
+        function exportOrder() {
+            let text = `📅 ${titleEl.textContent}\n`;
+            let hasData = false; let unconfirmedDrinks = 0;
+            data.forEach(g => { if (g.type === 'drink') { g.items.forEach(i => { if (!i.checked) unconfirmedDrinks++; }); } });
+            if (unconfirmedDrinks > 0) { if (!confirm(`还有 ${unconfirmedDrinks} 种饮料未确认（黄色）。\n这些不会被导出。\n\n确定要继续吗？`)) return; }
+
+            data.forEach(g => {
+                let activeItems = [];
+                if (g.type === 'misc') { activeItems = g.items.filter(i => i.isMissing); } 
+                else if (g.type === 'drink') { activeItems = g.items.filter(i => i.checked); } 
+                else { activeItems = g.items.filter(i => i.count > 0); }
+
+                if (activeItems.length > 0) {
+                    let finalItems = activeItems;
+                    if (g.type === 'normal') finalItems = activeItems.filter(i => i.count > 0);
+                    
+                    if (finalItems.length > 0) {
+                        text += `\n【${g.category}】\n`; hasData = true;
+                        finalItems.forEach(i => {
+                            if (g.type === 'misc') { text += `${i.name}：缺货 ❗️\n`; } 
+                            else {
+                                let q = (i.step === 0.25) ? formatQuantityText(i.count) : (i.count + i.unit);
+                                let alert = "";
+                                if (i.step === 0.25 && i.count <= 0.5) alert = " ❗️";
+                                if (i.count === 0) { q = "0" + i.unit; alert = " ❗️(缺货)"; }
+                                text += `${i.name}：${q}${alert}\n`;
+                            }
+                        });
+                    }
+                }
+            });
+
+            if (!hasData) { alert("列表是空的！"); return; }
+            const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand('copy');
+            alert("✅ 点货单已复制！"); document.body.removeChild(ta);
+        }
+
+        function exportConfig() { const str = JSON.stringify(JSON.parse(localStorage.getItem(STORAGE_KEY)).data, null, 4); const ta = document.createElement('textarea'); ta.value = str; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); alert("配置已复制"); document.body.removeChild(ta); }
+        function factoryReset() { if(confirm("确定重置？")) { localStorage.removeItem(STORAGE_KEY); location.reload(); } }
+
+        // 启动流程
+        checkBirthdayMagic(); // 1. 先查是不是生日
+        initDate();           // 2. 初始化日期标题
+        loadData();           // 3. 加载数据
+        render();             // 4. 渲染界面
+
+    </script>
+</body>
+</html>
